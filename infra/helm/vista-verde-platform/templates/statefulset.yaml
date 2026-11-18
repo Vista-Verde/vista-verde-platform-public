@@ -1,0 +1,146 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vista-verde-local
+  labels: { app.kubernetes.io/part-of: vista-verde-local }
+spec:
+  serviceName: unused-no-network-service
+  replicas: 1
+  selector:
+    matchLabels: { app: vista-verde-local }
+  template:
+    metadata:
+      labels: { app: vista-verde-local, app.kubernetes.io/part-of: vista-verde-local }
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector: { kubernetes.io/arch: arm64 }
+      securityContext:
+        fsGroup: 999
+        seccompProfile: { type: RuntimeDefault }
+      # Native sidecar starts PG before initialization, remains alive for the app,
+      # and terminates after the app. PG and the original API remain loopback only.
+      initContainers:
+        - name: postgres
+          restartPolicy: Always
+          image: {{ .Values.postgresImage | quote }}
+          imagePullPolicy: Never
+          args: ['postgres', '-c', 'listen_addresses=127.0.0.1', '-c', 'max_connections=20', '-c', 'shared_buffers=128MB', '-c', 'work_mem=4MB', '-c', 'max_wal_size=256MB', '-c', 'log_statement=none', '-c', 'log_min_error_statement=panic']
+          env:
+            - { name: POSTGRES_DB, value: vista_verde_local }
+            - { name: POSTGRES_PASSWORD_FILE, value: /run/vista-verde/database-password }
+            - { name: POSTGRES_INITDB_ARGS, value: '--auth-host=scram-sha-256 --auth-local=scram-sha-256' }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          resources:
+            requests: { memory: 256Mi, cpu: 100m }
+            limits: { memory: 1Gi, cpu: '1' }
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          startupProbe:
+            exec: { command: [pg_isready, -h, '127.0.0.1', -U, postgres, -d, vista_verde_local] }
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            exec: { command: [pg_isready, -h, '127.0.0.1', -U, postgres, -d, vista_verde_local] }
+            periodSeconds: 10
+          volumeMounts:
+            - { name: database, mountPath: /var/lib/postgresql/data }
+            - { name: pg-sockets, mountPath: /var/run/postgresql }
+            - { name: admin-input, mountPath: /run/vista-verde, readOnly: true }
+            - { name: pg-tmp, mountPath: /tmp }
+        - name: bootstrap
+          image: {{ .Values.appImage | quote }}
+          imagePullPolicy: Never
+          command: [node, dist/apps/local/src/bootstrap.js]
+          env:
+            - { name: VV_LOCAL_MODE, value: synthetic_loopback }
+            - { name: VV_DATABASE_USER, value: postgres }
+            {{- if .Values.workOrderDemo.enabled }}
+            - { name: VV_WORK_ORDER_DEMO_ENABLED, value: 'true' }
+            {{- end }}
+          resources:
+            requests: { memory: 128Mi, cpu: 100m }
+            limits: { memory: 256Mi, cpu: '1' }
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: bootstrap-input, mountPath: /run/vista-verde, readOnly: true }
+      containers:
+        - name: app
+          image: {{ .Values.appImage | quote }}
+          imagePullPolicy: Never
+          command: [node, dist/apps/local/src/serve.js]
+          env:
+            - { name: VV_LOCAL_MODE, value: synthetic_loopback }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=256 }
+            {{- if .Values.workOrderDemo.enabled }}
+            - { name: VV_WORK_ORDER_DEMO_ENABLED, value: 'true' }
+            {{- end }}
+            {{- if .Values.ownerAccess.enabled }}
+            - { name: VV_OWNER_ACCESS_ENABLED, value: 'true' }
+            - { name: VV_OWNER_ACCESS_AUDIENCE, value: {{ required "ownerAccess.audience must be the new Access application AUD" .Values.ownerAccess.audience | quote }} }
+            {{- if .Values.ownerAccess.subject }}
+            - { name: VV_OWNER_ACCESS_SUBJECT, value: {{ .Values.ownerAccess.subject | quote }} }
+            {{- end }}
+            {{- if .Values.ownerAccess.storybook }}
+            {{- if or (not (regexMatch "^[a-f0-9]{64}$" .Values.ownerAccess.storybookSha256)) (eq .Values.ownerAccess.storybookSha256 (repeat 64 "0")) }}
+            {{- fail "ownerAccess.storybookSha256 must bind the reviewed synthetic production artifact" }}
+            {{- end }}
+            - { name: VV_OWNER_STORYBOOK, value: 'true' }
+            - { name: VV_OWNER_STORYBOOK_SHA256, value: {{ .Values.ownerAccess.storybookSha256 | quote }} }
+            {{- end }}
+            {{- end }}
+          resources:
+            requests: { memory: 128Mi, cpu: 100m }
+            limits: { memory: 512Mi, cpu: '1' }
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+          startupProbe:
+            exec: { command: [node, dist/apps/local/src/health.js, live] }
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            exec: { command: [node, dist/apps/local/src/health.js, live] }
+            periodSeconds: 10
+          readinessProbe:
+            exec: { command: [node, dist/apps/local/src/health.js, ready] }
+            periodSeconds: 10
+          volumeMounts:
+            - { name: app-input, mountPath: /run/vista-verde, readOnly: true }
+      volumes:
+        - name: database
+          persistentVolumeClaim: { claimName: vista-verde-database }
+        - name: pg-sockets
+          emptyDir: { sizeLimit: 16Mi }
+        - name: pg-tmp
+          emptyDir: { sizeLimit: 32Mi }
+        - name: admin-input
+          secret:
+            secretName: {{ .Values.secretName | quote }}
+            defaultMode: 0440
+            items: [{ key: database-password, path: database-password }]
+        - name: bootstrap-input
+          secret:
+            secretName: {{ .Values.secretName | quote }}
+            defaultMode: 0440
+            items: [{ key: database-password, path: database-password }, { key: application-password, path: application-password }, { key: fixture-key, path: fixture-key }]
+        - name: app-input
+          secret:
+            secretName: {{ .Values.secretName | quote }}
+            defaultMode: 0440
+            items: [{ key: application-password, path: database-password }, { key: fixture-key, path: fixture-key }]

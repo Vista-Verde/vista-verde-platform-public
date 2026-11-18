@@ -1,0 +1,10 @@
+import type { Input, Success } from './index.ts';
+export type Specification = { id: string; revision: number; unit: string; criteria: { process: string; material: string; dimensions: { width: number; unit: string }; acceptance: string }; reviewedFixture: true };
+export type WorkspaceRecord = { id: string; title: string; state?: string; recordVersion?: number; requirementRevision?: number; slotCount?: number; receipt?: Success };
+export type Workspace = { role: 'buyer_agent' | 'buyer_human' | 'producer'; actorId: string; organizationId: string;
+  funds: { currency: string; balanceMinorUnits: number; reservedMinorUnits: number; availableMinorUnits: number };
+  terms: { id:string; revision:number; fixtureTerms:SlotView['fixtureTerms'] }[];
+  specifications: Specification[]; records: WorkspaceRecord[]; collection: 'requirements' | 'commitments'; nextCursor: string | null };
+export type SlotView = Input<'publishRequirement'>['slots'][number] & { requirementId: string; requirementRevision: number; recordVersion: number; state: string; commitmentId?: string;
+  releasedSpecification: { criteria: Specification['criteria']; reviewedFixture: true }; fixtureTerms: { synthetic: true; recipientAccount: string; compensationTrigger: string; disposition: string } };
+export type RequirementView = { draft: Input<'createRequirementDraft'>; missing: string[]; slots: SlotView[] };

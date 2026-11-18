@@ -1,0 +1,4 @@
+body { margin: 0; }
+.storybook-market { box-sizing: border-box; min-height: 100vh; padding: 24px; }
+.storybook-fixture-notice { font-size: 11px; border-bottom: 1px solid #3c5949; padding-bottom: 12px; margin-bottom: 20px; }
+@media (max-width: 600px) { .storybook-market { padding: 12px; } }

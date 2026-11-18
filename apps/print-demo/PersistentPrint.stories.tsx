@@ -1,0 +1,18 @@
+import type {Meta,StoryObj} from '@storybook/react-vite';
+import {expect,fn} from 'storybook/test';
+import {PrintIntake,PrintJobDetail} from '../web/market/print-workspace.tsx';
+import {demoWorkspace} from '../../.storybook/fixtures.ts';
+import {panelWorkOrder,producerResponse,supplyItems} from '../../.storybook/work-fixtures.ts';
+import type {MarketOrder,PrintRequirements} from '../../packages/contracts/src/market.ts';
+import '../web/market/market.css';
+const requirements:PrintRequirements={version:'mock-print.v1',profile:'FDM-PETG-175-BLACK-SYNTH',mesh:{format:'binary',triangles:12,bounds:[20,20,20],units:'mm',synthetic:true},materialResponsibility:'producer',delivery:{mode:'mock_courier',zone:'A',allowance:{minorUnits:1000,currency:'USD'}}};
+const work:MarketOrder={...panelWorkOrder,orderId:'story-print-job',itemId:'PRINT-STORY',need:'One fictional small print',quantity:{value:1,unit:'each'},allocatedQuantity:{value:0,unit:'each'},remainingQuantity:{value:1,unit:'each'},budget:{minorUnits:3000,currency:'USD'},budgetCommitted:{minorUnits:0,currency:'USD'},remainingBudget:{minorUnits:3000,currency:'USD'},printRequirements:requirements};
+const proposal={...producerResponse,proposalId:'story-print-response',buyOrderId:work.orderId,quantity:{value:1,unit:'each' as const},unitPrice:{minorUnits:3000,currency:'USD' as const},expiresAt:'2099-01-01T00:00:00Z',buyOrderSnapshot:work,sellOrderSnapshot:{...producerResponse.sellOrderSnapshot,itemId:work.itemId,printRequirements:requirements}};
+const workspace={...demoWorkspace,orders:[work],proposals:[proposal],commitments:[]};
+const actions={blocked:false,command:fn(),refresh:fn(),message:fn()};
+const meta={title:'Print/Persistent job workspace',component:PrintIntake,tags:['autodocs'],args:{actions,workspace},decorators:[Story=><main className="market-root" style={{padding:24}}><h1 className="market-sr-only">Persistent print component reference</h1><p>Storybook fixture · local callbacks only. <a href="/app#jobs" target="_top">Open the persistent synthetic app</a></p><Story/></main>]} satisfies Meta<typeof PrintIntake>;
+export default meta;
+type Story=StoryObj<typeof meta>;
+export const Requirements:Story={play:async({canvas,userEvent})=>{await userEvent.click(canvas.getByRole('button',{name:'Use labeled synthetic cube'}));await expect(canvas.getByText(/Synthetic 20 mm cube · not your design/)).toBeVisible();const review=canvas.getByLabelText('I reviewed the displayed metadata and terms for this synthetic work order.');await userEvent.click(review);await expect(canvas.getByRole('button',{name:'Post mock print job'})).toBeEnabled();}};
+export const PendingApproval:Story={render:()=> <PrintJobDetail workOrder={work} workspace={workspace} items={supplyItems} actions={actions} materialSourceLinks={[]} materialListings={[]}/>,play:async({canvas})=>{await expect(canvas.getByRole('button',{name:/Review approval/})).toBeVisible();await expect(canvas.getByText(/no autonomous agent runner/)).toBeVisible();}};
+export const ExpiredResponse:Story={render:()=> <PrintJobDetail workOrder={work} workspace={{...workspace,proposals:[{...proposal,state:'expired'}]}} items={supplyItems} actions={actions} materialSourceLinks={[]} materialListings={[]}/>};

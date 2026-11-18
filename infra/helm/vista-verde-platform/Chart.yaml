@@ -1,0 +1,7 @@
+apiVersion: v2
+name: vista-verde-platform
+description: Isolated synthetic loopback-only Vista Verde operation
+type: application
+version: 0.1.0
+appVersion: foundation.v0.1
+kubeVersion: '>=1.33.0-0'

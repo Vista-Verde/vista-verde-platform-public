@@ -1,0 +1,14 @@
+appImage: vista-verde/local-app:review-required
+postgresImage: postgres@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
+secretName: vista-verde-local-credentials
+storageClass: vista-verde-local-retain
+storageSize: 10Gi
+workOrderDemo:
+  enabled: false
+ownerAccess:
+  enabled: false
+  # Required NEW Access app AUD after separately approved creation. No fallback.
+  audience: ''
+  subject: ''
+  storybook: false
+  storybookSha256: ''

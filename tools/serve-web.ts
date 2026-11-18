@@ -1,0 +1,20 @@
+import { localPool,migrate,PostgresRepository } from '../packages/db/src/postgres.ts';
+import { seed,draft,publication } from '../packages/db/src/fixtures.ts';
+import { Application } from '../packages/domain/src/index.ts';
+import { startHttp } from '../apps/api/src/http.ts';
+const connectionString=process.env.VV_TEST_DATABASE_URL!;
+const pool=localPool(connectionString);
+await migrate(pool); const credentials=await seed(pool);
+const application=new Application(new PostgresRepository(pool));
+const created=await application.execute('createRequirementDraft',{ ...draft('web-demo-starter'),intendedUse:'Housing component starter allocation' },credentials['buyer-agent']!.context);
+if (!created.ok) throw new Error('Synthetic starter draft failed.');
+const input=publication(created.recordIds.requirementId!,'starter-housing',60000,new Date(Date.now()+86400000).toISOString());
+input.slots[0]!.slotPrice.minorUnits=2500;
+const published=await application.execute('publishRequirement',input,credentials.buyer!.context);
+if (!published.ok) throw new Error('Synthetic starter publication failed.');
+const personas=Object.fromEntries([['buyer-agent','Buyer agent · draft demand'],['buyer','Buyer human · review & publish'],['producer-a','Producer A · reviewed fixture'],['producer-b','Producer B · reviewed fixture']].map(([id,label]) => [id!,{ label:label!,token:credentials[id!]!.token }]));
+const api=await startHttp(connectionString,'local_test',{ personas });
+console.log(`\nVista Verde synthetic workspace: ${api.url}\nLocal fixture roles only. No real payments. Grants expire in one hour.\nCtrl+C removes this isolated demonstration and its synthetic data.\n`);
+let closed=false;
+async function close() { if (closed) return; closed=true; await api.close(); await pool.end(); }
+process.once('SIGINT',() => { void close(); }); process.once('SIGTERM',() => { void close(); });

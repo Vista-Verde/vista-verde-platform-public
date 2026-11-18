@@ -1,0 +1,36 @@
+{{- if and .Values.ownerAccess.storybook (not .Values.ownerAccess.enabled) }}
+{{- fail "ownerAccess.storybook requires the existing owner gateway" }}
+{{- end }}
+{{- if .Values.ownerAccess.enabled }}
+{{- if or (not (regexMatch "^[a-f0-9]{64}$" .Values.ownerAccess.audience)) (eq .Values.ownerAccess.audience (repeat 64 "0")) }}
+{{- fail "ownerAccess.audience must be a real 64-character Access application AUD; placeholders are refused" }}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: vista-verde-platform-access
+  labels: { app.kubernetes.io/part-of: vista-verde-local }
+spec:
+  type: ClusterIP
+  selector: { app: vista-verde-local }
+  ports:
+    - { name: owner-access, port: 4319, targetPort: 4319, protocol: TCP }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vista-verde-platform-access
+  labels: { app.kubernetes.io/part-of: vista-verde-local }
+spec:
+  podSelector:
+    matchLabels: { app: vista-verde-local }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: cloudflared }
+          podSelector:
+            matchLabels: { app: cloudflared }
+      ports:
+        - { port: 4319, protocol: TCP }
+{{- end }}

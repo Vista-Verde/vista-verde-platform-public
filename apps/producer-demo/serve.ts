@@ -1,0 +1,10 @@
+import {startProducer} from './server.ts';
+const raw=process.env.VV_PRODUCER_PORT??'4320';
+if(!/^\d{1,5}$/.test(raw)||Number(raw)>65535)throw new Error('Invalid producer port');
+const stateFile=process.env.VV_PRODUCER_STATE_FILE;
+const service=await startProducer({port:Number(raw),...(stateFile===undefined?{}:{stateFile})});
+if(process.send)process.send({ready:true,url:service.url,runId:service.runId});
+else console.log(`Synthetic producer service ready at ${service.url}; run ${service.runId}; ${stateFile===undefined?'memory':'durable checkpoint'} mode; no machine control.`);
+let closing=false;
+const close=async()=>{if(closing)return;closing=true;await service.close();if(process.connected)process.disconnect?.();};
+process.once('SIGTERM',()=>{void close();});process.once('SIGINT',()=>{void close();});

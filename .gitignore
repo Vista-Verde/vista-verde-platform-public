@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-tests/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+web-artifacts/
+.local/
+legacy-dist/
+storybook-static/
+storybook-artifacts/
+
+# Optional personal BMAD settings; shared project defaults remain reviewable.
+_bmad/**/*.user.toml
+_bmad/**/config.user.yaml
+_bmad/**/user-config.yaml

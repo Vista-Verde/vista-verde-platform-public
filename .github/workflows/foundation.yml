@@ -1,0 +1,96 @@
+name: Foundation integration
+
+'on':
+  pull_request:
+    branches: [main, feature/react-web-workspace]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: foundation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  integration:
+    name: Locked foundation integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out integration candidate
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 2 # Keep merge-candidate parents available for verification.
+          persist-credentials: false
+
+      - name: Set up pinned Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '26.0.0'
+          package-manager-cache: false
+
+      - name: Pin npm and report tested commit
+        run: |
+          npm install --global npm@11.12.1 --ignore-scripts --no-audit --no-fund
+          test "$(node --version)" = 'v26.0.0'
+          test "$(npm --version)" = '11.12.1'
+          git show -s --format='Tested commit: %H%nParents: %P'
+
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Contract tests
+        run: npm run test:contracts
+
+      - name: Preserved SQLite regressions
+        run: npm test
+
+      - name: React client recovery and component regressions
+        run: npm run test:react
+
+      - name: Exploratory synthetic economics formulas
+        run: npm run test:economics
+
+      - name: Cache exact isolated PostgreSQL image
+        # The same multi-architecture digest as the local fixture. No credentials.
+        run: docker pull postgres@sha256:5a65324fe84dc41709ff914e90b07f3e2f577073ed27bf917d4873aca0c9ec51
+
+      - name: Build and real PostgreSQL, MCP SDK and HTTP integration
+        # Harness owns/removes its UUID container, tmpfs and loopback databases.
+        run: npm run test:foundation
+
+      - name: Install pinned Chromium for browser journeys
+        run: npx --no-install playwright install --with-deps chromium
+
+      - name: Real browser buyer and producer journeys
+        # Same application, real isolated PostgreSQL; no browser API mocking.
+        run: npm run test:web
+
+      - name: Compact market keyboard, mobile and accessibility journeys
+        run: node tools/test-foundation.ts compact
+
+      - name: Real requester and simulated producer service/browser journeys
+        run: node tools/test-foundation.ts producer
+
+      - name: React development StrictMode browser regressions
+        run: npm run test:web:strict
+
+      - name: Production synthetic Storybook build
+        run: npm run build:storybook:production
+
+      - name: Storybook interactions and accessibility at desktop and mobile sizes
+        run: npm run test:storybook
+
+      - name: Production static Storybook hosting and security regressions
+        run: npm run test:storybook:host
+
+      # Historical legacy-image compatibility jobs are excluded: their private
+      # baseline commit and frozen artifact are not part of this clean snapshot.

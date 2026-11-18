@@ -10,10 +10,11 @@ export const Overview:Story = {
   play:async ({ canvas,canvasElement,userEvent }) => {
     await expect(canvas.getByRole('heading',{ name:'Places to learn, discuss and demonstrate.' })).toBeVisible();
     await expect(canvas.getAllByRole('article')).toHaveLength(5);
+    await expect(canvas.getByText('Historical illustrative research')).toBeVisible();
     await expect(canvas.getByText(/America\/Chicago/)).toBeVisible();
     await expect(canvas.getByText(/Reported free in prior research; reconfirm admission/)).toBeVisible();
     await expect(canvas.getByText(/the dated event page states no price/)).toBeVisible();
-    await expect(canvas.getByText(/owner-only private preview is not ready for a public trial/)).toBeVisible();
+    await expect(canvas.getByText(/A source snapshot alone is not a hosted public trial\. Verify readiness and current submission guidelines/)).toBeVisible();
     for (const source of demoOpportunities.flatMap(opportunity => opportunity.sources)) {
       const link = canvas.getByRole('link',{ name:source.label });
       await expect(link).toHaveAttribute('href',source.url);

@@ -6,7 +6,7 @@ An experimental agent-first marketplace for physical goods, with human supervisi
 
 This is a sanitized source snapshot with fresh history. It does not include private planning records, founder context, deployment records, credentials, production data, prior commits, issues or pull requests.
 
-**License decision pending. No open-source license is granted for the original platform code at this time.** Public visibility is not an open-source license. Third-party dependencies remain subject to their own licenses. Do not assume permission to redistribute or commercially reuse the original code until a license is adopted.
+The original platform code in this public repository is licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for copyright attribution. Third-party dependencies remain subject to their own licenses.
 
 ## What is included
 
